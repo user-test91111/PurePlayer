@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">pure player 1</string>
+    <string name="title_activity_search">SearchActivity</string>
+    <string name="title_activity_search2">SearchActivity2</string>
+    <string name="title_activity_favs">FavsActivity</string>
+    <string name="title_activity_nav_host_controller">NavHostController</string>
+    <string name="title_activity_player">Player</string>
+    <string name="title_activity_player_state">PlayerState</string>
+    <string name="title_activity_mini_player">MiniPlayer</string>
+</resources>
