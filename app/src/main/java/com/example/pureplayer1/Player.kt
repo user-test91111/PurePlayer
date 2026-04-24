@@ -15,37 +15,86 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.pureplayer1.data.Track
+import com.google.android.exoplayer2.source.hls.playlist.HlsMediaPlaylist
+
 
 object PlayerState {
     var currentTrack by mutableStateOf<Track?>(null)
     var isPlaying by mutableStateOf(false)
     var isVisible by mutableStateOf(false)
+    var repeatMode by mutableStateOf(RepeatMode.OFF)
+
+    // Очередь треков для переключения
+    var currentPlaylist by mutableStateOf<List<Track>>(emptyList())
+    var currentPlaylistType by mutableStateOf(PlaylistType.NONE)
 
     lateinit var audioPlayer: AudioPlayerManager
+    lateinit var favoritesManager: FavoritesManager
         private set
 
     fun init(context: Context) {
         if (!::audioPlayer.isInitialized) {
             audioPlayer = AudioPlayerManager(context.applicationContext)
         }
+        if (!::favoritesManager.isInitialized) {
+            favoritesManager = FavoritesManager(context.applicationContext)
+        }
     }
 
-    fun playTrack(track: Track) {
+    fun playTrack(track: Track, playlist: List<Track> = emptyList(), playlistType: PlaylistType = PlaylistType.NONE) {
         currentTrack = track
+        if (playlist.isNotEmpty()) {
+            currentPlaylist = playlist
+            currentPlaylistType = playlistType
+        }
         isPlaying = true
         isVisible = true
         audioPlayer.playTrack(track)
     }
 
+    fun playNext() {
+        if (currentPlaylist.isEmpty()) return
+
+        val currentIndex = currentPlaylist.indexOfFirst {
+            it.title == currentTrack?.title && it.artist == currentTrack?.artist
+        }
+
+        if (currentIndex != -1 && currentIndex + 1 < currentPlaylist.size) {
+            val nextTrack = currentPlaylist[currentIndex + 1]
+            playTrack(nextTrack, currentPlaylist, currentPlaylistType)
+        } else if (repeatMode == RepeatMode.ALL && currentPlaylist.isNotEmpty()) {
+            // Зацикливание плейлиста
+            val firstTrack = currentPlaylist.first()
+            playTrack(firstTrack, currentPlaylist, currentPlaylistType)
+        }
+    }
+
+    fun playPrevious() {
+        if (currentPlaylist.isEmpty()) return
+
+        val currentIndex = currentPlaylist.indexOfFirst {
+            it.title == currentTrack?.title && it.artist == currentTrack?.artist
+        }
+
+        if (currentIndex > 0) {
+            val previousTrack = currentPlaylist[currentIndex - 1]
+            playTrack(previousTrack, currentPlaylist, currentPlaylistType)
+        } else if (repeatMode == RepeatMode.ALL && currentPlaylist.isNotEmpty()) {
+            // Зацикливание плейлиста
+            val lastTrack = currentPlaylist.last()
+            playTrack(lastTrack, currentPlaylist, currentPlaylistType)
+        }
+    }
+
     fun togglePlay() {
         audioPlayer.togglePlay()
-        // Состояние обновится через StateFlow
     }
 
     fun hide() {
@@ -56,11 +105,37 @@ object PlayerState {
         audioPlayer.seekTo(position)
     }
 
+    fun toggleRepeat() {
+        repeatMode = when (repeatMode) {
+            RepeatMode.OFF -> RepeatMode.ONE
+            RepeatMode.ONE -> RepeatMode.ALL
+            RepeatMode.ALL -> RepeatMode.OFF
+        }
+    }
+
+    fun isTrackFavorite(track: Track?): Boolean {
+        track ?: return false
+        return favoritesManager.isFavorite(track)
+    }
+
+    fun toggleFavorite(track: Track?): Boolean {
+        track ?: return false
+        return favoritesManager.toggleFavorite(track)
+    }
+
     fun release() {
         if (::audioPlayer.isInitialized) {
             audioPlayer.release()
         }
     }
+}
+
+enum class RepeatMode {
+    OFF, ONE, ALL
+}
+
+enum class PlaylistType {
+    NONE, SEARCH, FAVORITES
 }
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -73,8 +148,10 @@ fun PlayerScreen(
     val duration by PlayerState.audioPlayer.duration.collectAsStateWithLifecycle()
     val isPreparing by PlayerState.audioPlayer.isPreparing.collectAsStateWithLifecycle()
     val error by PlayerState.audioPlayer.error.collectAsStateWithLifecycle()
+    val repeatMode by remember { derivedStateOf { PlayerState.repeatMode } }
 
-    var isLiked by remember { mutableStateOf(false) }
+    // Состояние лайка
+    var isLiked by remember { mutableStateOf(PlayerState.isTrackFavorite(track)) }
 
     Scaffold(
         topBar = {
@@ -87,7 +164,9 @@ fun PlayerScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = { navController.navigateUp() }) {
+                    IconButton(onClick = {
+                        navController.navigateUp()
+                    }) {
                         Icon(
                             imageVector = Icons.Default.ArrowBack,
                             contentDescription = "Назад"
@@ -100,21 +179,22 @@ fun PlayerScreen(
                     navigationIconContentColor = MaterialTheme.colorScheme.onSurface
                 )
             )
-        }
+        },
     ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(MaterialTheme.colorScheme.background),
+                .background(MaterialTheme.colorScheme.background)
+                .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             // Обложка
             Box(
                 modifier = Modifier
-                    .size(280.dp)
+                    .size(260.dp)
                     .clip(RoundedCornerShape(20.dp))
                     .background(MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center
@@ -138,28 +218,37 @@ fun PlayerScreen(
             Spacer(modifier = Modifier.height(32.dp))
 
             // Информация о треке
-            Text(
-                text = track.title ?: "Без названия",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = track.title ?: "Без названия",
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth()
+                )
 
-            Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-            Text(
-                text = track.artist ?: "Неизвестный исполнитель",
-                fontSize = 18.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+                Text(
+                    text = track.artist ?: "Неизвестный исполнитель",
+                    fontSize = 16.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
 
             Spacer(modifier = Modifier.height(32.dp))
 
             // Прогресс бар
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
+                modifier = Modifier.fillMaxWidth()
             ) {
                 if (duration > 0) {
                     Slider(
@@ -176,7 +265,6 @@ fun PlayerScreen(
                         )
                     )
                 } else {
-                    // Показываем индикатор загрузки пока нет длительности
                     LinearProgressIndicator(
                         modifier = Modifier.fillMaxWidth(),
                         color = MaterialTheme.colorScheme.primary
@@ -208,22 +296,8 @@ fun PlayerScreen(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Кнопка перемешивания
                 IconButton(
-                    onClick = { /* TODO: Перемешать */ },
-                    modifier = Modifier.size(48.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Shuffle,
-                        contentDescription = "Перемешать",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
-
-                // Предыдущий
-                IconButton(
-                    onClick = { /* TODO: Предыдущий трек */ },
+                    onClick = { /* Предыдущий трек */ },
                     modifier = Modifier.size(56.dp)
                 ) {
                     Icon(
@@ -234,14 +308,11 @@ fun PlayerScreen(
                     )
                 }
 
-                // Play/Pause
                 IconButton(
                     onClick = {
-                        if (isPreparing) {
-                            // Если еще грузится, ничего не делаем
-                            return@IconButton
+                        if (!isPreparing) {
+                            PlayerState.togglePlay()
                         }
-                        PlayerState.togglePlay()
                     },
                     modifier = Modifier
                         .size(72.dp)
@@ -270,9 +341,8 @@ fun PlayerScreen(
                     }
                 }
 
-                // Следующий
                 IconButton(
-                    onClick = { /* TODO: Следующий трек */ },
+                    onClick = { /* Следующий трек */ },
                     modifier = Modifier.size(56.dp)
                 ) {
                     Icon(
@@ -282,65 +352,52 @@ fun PlayerScreen(
                         modifier = Modifier.size(40.dp)
                     )
                 }
-
-                // Повтор
-                IconButton(
-                    onClick = { /* TODO: Повтор */ },
-                    modifier = Modifier.size(48.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Repeat,
-                        contentDescription = "Повтор",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Нижняя панель с дополнительными кнопками
+            // Нижняя панель с кнопками
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 48.dp),
+                    .padding(horizontal = 32.dp),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                // Лайк
+                // Кнопка повтора
                 IconButton(
-                    onClick = { isLiked = !isLiked },
+                    onClick = { PlayerState.toggleRepeat() },
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(
+                        imageVector = when (repeatMode) {
+                            RepeatMode.OFF -> Icons.Default.Repeat
+                            RepeatMode.ONE -> Icons.Default.RepeatOne
+                            RepeatMode.ALL -> Icons.Default.Repeat
+                        },
+                        contentDescription = when (repeatMode) {
+                            RepeatMode.OFF -> "Без повтора"
+                            RepeatMode.ONE -> "Повтор трека"
+                            RepeatMode.ALL -> "Повтор плейлиста"
+                        },
+                        tint = when (repeatMode) {
+                            RepeatMode.OFF -> MaterialTheme.colorScheme.onSurfaceVariant
+                            else -> MaterialTheme.colorScheme.primary
+                        },
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+
+                // Кнопка лайка
+                IconButton(
+                    onClick = {
+                        isLiked = PlayerState.toggleFavorite(track)
+                    },
                     modifier = Modifier.size(48.dp)
                 ) {
                     Icon(
                         imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
                         contentDescription = if (isLiked) "Удалить из избранного" else "Добавить в избранное",
                         tint = if (isLiked) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
-
-                // Добавить в плейлист
-                IconButton(
-                    onClick = { /* TODO: Добавить в плейлист */ },
-                    modifier = Modifier.size(48.dp)
-                ) {
-                    Icon(
-                        Icons.Default.PlaylistAdd,
-                        contentDescription = "В плейлист",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
-
-                // Поделиться
-                IconButton(
-                    onClick = { /* TODO: Поделиться */ },
-                    modifier = Modifier.size(48.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Share,
-                        contentDescription = "Поделиться",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(28.dp)
                     )
                 }
@@ -365,7 +422,6 @@ fun PlayerScreen(
         }
     }
 }
-
 @Composable
 fun formatTime(milliseconds: Int): String {
     if (milliseconds <= 0) return "0:00"

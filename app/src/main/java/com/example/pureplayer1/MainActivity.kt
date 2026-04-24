@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -42,6 +43,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,6 +54,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -80,6 +83,11 @@ class MainActivity : ComponentActivity() {
             MaterialTheme {
                 navController = rememberNavController()
                 viewModel = viewModel()
+
+                LaunchedEffect(Unit) {
+                    viewModel.loadPopularTracks()
+                    viewModel.loadRecommendedTracks()
+                }
 
                 val navBackStateEntry by navController.currentBackStackEntryAsState()
                 var currentRoute = navBackStateEntry?.destination?.route
@@ -163,158 +171,115 @@ fun bottomBarApp(navController: NavHostController, currentRoute: String?){
             }
         }
     }
-
 @SuppressLint("SuspiciousIndentation")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen(navController: NavHostController, currentRoute: String?) {
+fun MainScreen(
+    navController: NavHostController,
+    currentRoute: String?,
+    viewModel: AudioViewModel
+) {
     val scrollState = rememberScrollState()
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding()
-                .verticalScroll(scrollState)
-                .background(MaterialTheme.colorScheme.background)
-        ) {
-            // Заголовок
-            HeaderSection()
+    // Получаем треки из ViewModel
+    val popularTracks by viewModel.popularTracks.collectAsStateWithLifecycle()
+    val recommendedTracks by viewModel.recommendedTracks.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
 
-            Spacer(modifier = Modifier.height(24.dp))
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding()
+            .verticalScroll(scrollState)
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        // Заголовок
+        HeaderSection()
 
-            // Секция самых популярных
-            SectionTitle(
-                title = "Самые популярные",
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
+        Spacer(modifier = Modifier.height(24.dp))
 
-            Spacer(modifier = Modifier.height(12.dp))
+        // Секция самых популярных
+        SectionTitle(
+            title = "Самые популярные",
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
 
+        Spacer(modifier = Modifier.height(12.dp))
+
+        if (isLoading && popularTracks.isEmpty()) {
+            // Показываем индикатор загрузки
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
+            }
+        } else if (popularTracks.isNotEmpty()) {
             TrackList(
-                tracks = listOf(
-                    Track(
-//                        id = "1",
-                        title = "Blinding Lights",
-                        artist = "The Weeknd",
-//                        duration = "3:20",
-                        audioUrl = "",
-                        coverUrl = "",
-//                        isLiked = true,
-//                        playCount = 2500000
-                    ),
-//                    Track(
-//                        id = "2",
-//                        title = "Stay",
-//                        artist = "The Kid LAROI, Justin Bieber",
-//                        duration = "2:21",
-//                        isLiked = false,
-//                        playCount = 1800000
-//                    ),
-//                    Track(
-//                        id = "3",
-//                        title = "Heat Waves",
-//                        artist = "Glass Animals",
-//                        duration = "3:58",
-//                        isLiked = true,
-//                        playCount = 2200000
-//                    ),
-//                    Track(
-//                        id = "4",
-//                        title = "As It Was",
-//                        artist = "Harry Styles",
-//                        duration = "2:47",
-//                        isLiked = false,
-//                        playCount = 1900000
-//                    ),
-//                    Track(
-//                        id = "5",
-//                        title = "Bad Habit",
-//                        artist = "Steve Lacy",
-//                        duration = "3:52",
-//                        isLiked = true,
-//                        playCount = 1600000
-//                    )
-                ),
+                tracks = popularTracks,
                 onTrackClick = { track ->
-                    // TODO: Обработка клика на трек
-                    // Например: navigation.navigate("player/${track.id}")
-                    // Или: viewModel.playTrack(track)
+                    // Воспроизводим трек с плейлистом популярных треков
+                    PlayerState.playTrack(track, popularTracks, PlaylistType.NONE)
+                    navController.navigate(Routes.Player.route)
                 },
-                navController = navController,
                 onLikeClick = { track ->
-                    // TODO: Отправка запроса на сервер для добавления/удаления из избранного
-                    // Например: viewModel.toggleLike(track.id)
-                }
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Секция рекомендаций
-            SectionTitle(
-                title = "Рекомендации",
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            TrackList(
-                tracks = listOf(
-                    Track(
-//                        id = "1",
-                        title = "Blinding Lights",
-                        artist = "The Weeknd",
-//                        duration = "3:20",
-                        audioUrl = "",
-                        coverUrl = "",
-//                        isLiked = true,
-//                        playCount = 2500000
-                    ),
-//                    Track(
-//                        id = "7",
-//                        title = "Good 4 U",
-//                        artist = "Olivia Rodrigo",
-//                        duration = "2:58",
-//                        isLiked = true,
-//                        playCount = 1500000
-//                    ),
-//                    Track(
-//                        id = "8",
-//                        title = "Industry Baby",
-//                        artist = "Lil Nas X",
-//                        duration = "3:32",
-//                        isLiked = false,
-//                        playCount = 1400000
-//                    ),
-//                    Track(
-//                        id = "9",
-//                        title = "Shivers",
-//                        artist = "Ed Sheeran",
-//                        duration = "3:27",
-//                        isLiked = true,
-//                        playCount = 1300000
-//                    ),
-//                    Track(
-//                        id = "10",
-//                        title = "Easy On Me",
-//                        artist = "Adele",
-//                        duration = "3:44",
-//                        isLiked = false,
-//                        playCount = 1700000
-//                    )
-                ),
-                onTrackClick = { track ->
-                    // TODO: Обработка клика на трек
-
+                    PlayerState.toggleFavorite(track)
                 },
-                navController = navController,
-                onLikeClick = { track ->
-                    // TODO: Отправка запроса на сервер для добавления/удаления из избранного
-                }
+                navController = navController
             )
-
-            Spacer(modifier = Modifier.height(80.dp))
+        } else {
+            // Если нет треков, показываем сообщение
+            Text(
+                text = "Нет популярных треков",
+                modifier = Modifier.padding(16.dp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // Секция рекомендаций
+        SectionTitle(
+            title = "Рекомендации",
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        if (isLoading && recommendedTracks.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
+            }
+        } else if (recommendedTracks.isNotEmpty()) {
+            TrackList(
+                tracks = recommendedTracks,
+                onTrackClick = { track ->
+                    PlayerState.playTrack(track, recommendedTracks, PlaylistType.NONE)
+                    navController.navigate(Routes.Player.route)
+                },
+                onLikeClick = { track ->
+                    PlayerState.toggleFavorite(track)
+                },
+                navController = navController
+            )
+        } else {
+            Text(
+                text = "Нет рекомендаций",
+                modifier = Modifier.padding(16.dp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        Spacer(modifier = Modifier.height(80.dp))
     }
+}
 
 
 @Composable
@@ -632,7 +597,7 @@ fun PurePlayerApp() {
 fun Navigate(navController: NavHostController, currentRoute: String?,viewModel: AudioViewModel){
     NavHost(navController = navController, startDestination = Routes.Home.route) {
         composable(Routes.Home.route) {
-            MainScreen(navController, currentRoute = currentRoute)
+            MainScreen(navController, viewModel = viewModel, currentRoute = currentRoute)
         }
 
         composable(Routes.Search.route) {
@@ -640,7 +605,7 @@ fun Navigate(navController: NavHostController, currentRoute: String?,viewModel: 
         }
 
         composable(Routes.Favs.route) {
-            FavoritesScreen(navController = navController)
+            FavoritesScreen(navController = navController, currentRoute = currentRoute)
         }
 
         composable(Routes.Player.route) {

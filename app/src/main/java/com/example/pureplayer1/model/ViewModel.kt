@@ -32,15 +32,60 @@ import retrofit2.http.Query
 //    }
 //}
 class AudioViewModel : ViewModel() {
-    // Используем mutableStateFlow для автоматического обновления UI
     private val _searchTracks = MutableStateFlow<List<Track>>(emptyList())
     val searchTracks: StateFlow<List<Track>> = _searchTracks.asStateFlow()
+
+    private val _popularTracks = MutableStateFlow<List<Track>>(emptyList())
+    val popularTracks: StateFlow<List<Track>> = _popularTracks.asStateFlow()
+
+    private val _recommendedTracks = MutableStateFlow<List<Track>>(emptyList())
+    val recommendedTracks: StateFlow<List<Track>> = _recommendedTracks.asStateFlow()
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
+
+    // Популярные запросы для главного экрана
+    private val popularQueries = listOf("Weeknd", "Ed Sheeran", "Dua Lipa", "Imagine Dragons")
+    private val recommendedQueries = listOf("Pop", "Rock", "Alternative", "Hits")
+
+    fun loadPopularTracks() {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val allTracks = mutableListOf<Track>()
+                for (query in popularQueries) {
+                    val tracks = fetchMusic(query)
+                    allTracks.addAll(tracks.take(2)) // Берем по 2 трека с каждого запроса
+                }
+                _popularTracks.value = allTracks.distinctBy { it.title }.take(10)
+            } catch (e: Exception) {
+                _error.value = e.message
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    fun loadRecommendedTracks() {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val allTracks = mutableListOf<Track>()
+                for (query in recommendedQueries) {
+                    val tracks = fetchMusic(query)
+                    allTracks.addAll(tracks.take(2))
+                }
+                _recommendedTracks.value = allTracks.distinctBy { it.title }.take(10)
+            } catch (e: Exception) {
+                _error.value = e.message
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
 
     fun searchBySearchBar(query: String) {
         if (query.isEmpty()) {
@@ -55,10 +100,6 @@ class AudioViewModel : ViewModel() {
             try {
                 val tracks = fetchMusic(query)
                 _searchTracks.value = tracks
-
-                for (track in tracks) {
-                    Log.v("Track", "${track.artist} - ${track.title} - ${track.audioUrl} - ${track.coverUrl}")
-                }
             } catch (e: Exception) {
                 _error.value = e.message
                 _searchTracks.value = emptyList()
@@ -71,5 +112,4 @@ class AudioViewModel : ViewModel() {
     fun clearSearch() {
         _searchTracks.value = emptyList()
     }
-
 }

@@ -34,6 +34,23 @@ class AudioPlayerManager(private val context: Context) {
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
+    // Добавьте в AudioPlayerManager
+    fun onTrackComplete() {
+        when (PlayerState.repeatMode) {
+            RepeatMode.ONE -> {
+                // Повтор текущего трека
+                currentTrack?.let { playTrack(it) }
+            }
+            RepeatMode.ALL -> {
+                // Переход к следующему треку (нужно реализовать логику очереди)
+                // playNextTrack()
+            }
+            RepeatMode.OFF -> {
+                // Ничего не делать
+            }
+        }
+    }
+
     fun playTrack(track: Track) {
         // Если тот же трек и играет, ставим на паузу
         if (currentTrack == track && mediaPlayer?.isPlaying == true) {
