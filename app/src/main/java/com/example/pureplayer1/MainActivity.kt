@@ -1,9 +1,21 @@
 package com.example.pureplayer1
 
-
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
+import androidx.compose.material3.Typography
+import androidx.compose.material3.Shapes
+import androidx.compose.ui.graphics.Color
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 //import androidx.compose.material.icons.outlined.MusicNote
 //import androidx.compose.material.icons.filled.Audiotrack
 import android.annotation.SuppressLint
+import android.content.Context
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -15,9 +27,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -31,6 +46,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -40,6 +56,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScaffoldDefaults.contentWindowInsets
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -49,6 +66,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -79,6 +97,7 @@ class MainActivity : ComponentActivity() {
         setContent {
 
             PlayerState.init(this)
+            ThemeManager.loadThemeFromPreferences(this)
 
             MaterialTheme {
                 navController = rememberNavController()
@@ -92,7 +111,8 @@ class MainActivity : ComponentActivity() {
                 val navBackStateEntry by navController.currentBackStackEntryAsState()
                 var currentRoute = navBackStateEntry?.destination?.route
                 Navigate(navController, currentRoute = currentRoute,viewModel)
-                PurePlayerApp()
+
+                PurePlayerTheme()
             }
         }
         lifecycleScope.launch{
@@ -104,73 +124,96 @@ class MainActivity : ComponentActivity() {
     }
 }
 // Data class для трека (заготовка для API данных)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun bottomBarApp(navController: NavHostController, currentRoute: String?){
-
-        BottomAppBar(
-            containerColor = MaterialTheme.colorScheme.surface,
-            modifier = Modifier.height(60.dp)
+fun bottomBarApp(navController: NavHostController, currentRoute: String?) {
+    val density = LocalDensity.current
+    val navigationBarHeight = WindowInsets.navigationBars.getBottom(density)
+    NavigationBar(
+        containerColor = MaterialTheme.colorScheme.surface,
+        modifier = Modifier
+            .height(60.dp + (navigationBarHeight / 2).dp)
+            .navigationBarsPadding(), // Автоматически добавит отступы под системные кнопки
+        tonalElevation = 0.dp
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
         ) {
+            NavigationBarItem(
+                selected = currentRoute == Routes.Home.route,
+                onClick = { navController.navigate(Routes.Home.route) },
+                icon = {
+                    Icon(
+                        imageVector = Icons.Filled.Home,
+                        contentDescription = "Главная"
+                    )
+                },
+                label = { Text("Главная", fontSize = 10.sp) },
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            )
 
+            NavigationBarItem(
+                selected = currentRoute == Routes.Search.route,
+                onClick = { navController.navigate(Routes.Search.route) },
+                icon = {
+                    Icon(
+                        imageVector = Icons.Filled.Search,
+                        contentDescription = "Поиск"
+                    )
+                },
+                label = { Text("Поиск", fontSize = 10.sp) },
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            )
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                IconButton(
-                    onClick = {
-                        navController.navigate(Routes.Home.route)
-                              },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = Icons.Filled.Home,
-                            contentDescription = "Главная",
-                            tint = if (currentRoute == Routes.Home.route)
-                                MaterialTheme.colorScheme.primary
-                            else
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
+            NavigationBarItem(
+                selected = currentRoute == Routes.Favs.route,
+                onClick = { navController.navigate(Routes.Favs.route) },
+                icon = {
+                    Icon(
+                        imageVector = Icons.Filled.Favorite,
+                        contentDescription = "Избранное"
+                    )
+                },
+                label = { Text("Избранное", fontSize = 10.sp) },
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            )
 
-                IconButton(
-                    onClick = { navController.navigate(Routes.Search.route) },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = Icons.Filled.Search,
-                            contentDescription = "Поиск",
-                            tint = if (currentRoute == Routes.Search.route)
-                                MaterialTheme.colorScheme.primary
-                            else
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                IconButton(
-                    onClick = { navController.navigate(Routes.Favs.route) },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = Icons.Filled.Favorite,
-                            contentDescription = "Избранное",
-                            tint = if (currentRoute == Routes.Favs.route)
-                                MaterialTheme.colorScheme.primary
-                            else
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
+            NavigationBarItem(
+                selected = currentRoute == Routes.Settings.route,
+                onClick = { navController.navigate(Routes.Settings.route) },
+                icon = {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = "Настройки"
+                    )
+                },
+                label = { Text("Настройки", fontSize = 10.sp) },
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            )
         }
     }
+}
 @SuppressLint("SuspiciousIndentation")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -221,7 +264,7 @@ fun MainScreen(
                 tracks = popularTracks,
                 onTrackClick = { track ->
                     // Воспроизводим трек с плейлистом популярных треков
-                    PlayerState.playTrack(track, popularTracks, PlaylistType.NONE)
+                    PlayerState.playTrack(track, popularTracks)
                     navController.navigate(Routes.Player.route)
                 },
                 onLikeClick = { track ->
@@ -261,7 +304,7 @@ fun MainScreen(
             TrackList(
                 tracks = recommendedTracks,
                 onTrackClick = { track ->
-                    PlayerState.playTrack(track, recommendedTracks, PlaylistType.NONE)
+                    PlayerState.playTrack(track, recommendedTracks)
                     navController.navigate(Routes.Player.route)
                 },
                 onLikeClick = { track ->
@@ -280,10 +323,12 @@ fun MainScreen(
         Spacer(modifier = Modifier.height(80.dp))
     }
 }
-
-
 @Composable
 fun HeaderSection() {
+    val context = LocalContext.current
+    val prefs = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+    val userName = prefs.getString("user_name", "Гость") ?: "Гость"
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -303,7 +348,7 @@ fun HeaderSection() {
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "П",
+                    text = if (userName != "Гость") userName.take(1).uppercase() else "П",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
@@ -316,27 +361,19 @@ fun HeaderSection() {
                 modifier = Modifier.weight(1f)
             ) {
                 Text(
-                    text = "Добро пожаловать",
+                    text = "Добро пожаловать, ",
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = "Pure Player",
+                    text = if (userName != "Гость") userName else "Pure Player",
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
-
-//            IconButton(
-//                onClick = { /* TODO: Открыть поиск */ }
-//            ) {
-//                Icon(
-//                    imageVector = Icons.Filled.Search,
-//                    contentDescription = "Поиск",
-//                    tint = MaterialTheme.colorScheme.onSurface
-//                )
-//            }
         }
     }
 }
@@ -554,6 +591,8 @@ sealed class Routes(val route: String) {
     object Search : Routes("search")
     object Favs : Routes("favs")
     object Player : Routes("player")
+
+    object Settings : Routes("settings")
 }
 
 @Composable
@@ -608,6 +647,10 @@ fun Navigate(navController: NavHostController, currentRoute: String?,viewModel: 
             FavoritesScreen(navController = navController, currentRoute = currentRoute)
         }
 
+        composable(Routes.Settings.route) {
+            SettingsScreen(navController = navController, currentRoute = currentRoute)
+        }
+
         composable(Routes.Player.route) {
             val track = PlayerState.currentTrack
             if (track != null) {
@@ -621,3 +664,67 @@ fun Navigate(navController: NavHostController, currentRoute: String?,viewModel: 
         }
     }
 }
+
+
+@Composable
+fun PurePlayerTheme() {
+    val context = LocalContext.current
+    val isDarkTheme by ThemeManager.isDarkTheme.collectAsStateWithLifecycle()
+
+    // Сохраняем тему при изменении
+    LaunchedEffect(isDarkTheme) {
+        ThemeManager.saveThemeToPreferences(context, isDarkTheme)
+    }
+
+    MaterialTheme(
+        colorScheme = if (isDarkTheme) darkColorScheme() else lightColorScheme(),
+        typography = Typography(),
+        shapes = Shapes()
+    ) {
+        val navController = rememberNavController()
+        val viewModel: AudioViewModel = viewModel()
+
+        LaunchedEffect(Unit) {
+            viewModel.loadPopularTracks()
+            viewModel.loadRecommendedTracks()
+        }
+
+        val navBackStateEntry by navController.currentBackStackEntryAsState()
+        var currentRoute = navBackStateEntry?.destination?.route
+
+        PurePlayerApp()
+    }
+}
+
+// Цветовые схемы
+private fun darkColorScheme() = darkColorScheme(
+    primary = Purple80,
+    secondary = PurpleGrey80,
+    tertiary = Pink80,
+    background = Color(0xFF121212),
+    surface = Color(0xFF1E1E1E),
+    surfaceVariant = Color(0xFF2C2C2C),
+    onSurface = Color(0xFFFFFFFF),
+    onSurfaceVariant = Color(0xFFB0B0B0),
+    outline = Color(0x80FFFFFF)
+)
+
+private fun lightColorScheme() = lightColorScheme(
+    primary = Purple40,
+    secondary = PurpleGrey40,
+    tertiary = Pink40,
+    background = Color(0xFFFFFFFF),
+    surface = Color(0xFFF5F5F5),
+    surfaceVariant = Color(0xFFE8E8E8),
+    onSurface = Color(0xFF1A1A1A),
+    onSurfaceVariant = Color(0xFF6B6B6B),
+    outline = Color(0x80000000)
+)
+
+// Цвета Material Design
+private val Purple80 = Color(0xFFD0BCFF)
+private val PurpleGrey80 = Color(0xFFCCC2DC)
+private val Pink80 = Color(0xFFEFB8C8)
+private val Purple40 = Color(0xFF6650a4)
+private val PurpleGrey40 = Color(0xFF625b71)
+private val Pink40 = Color(0xFF7D5260)

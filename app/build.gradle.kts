@@ -43,6 +43,7 @@ android {
 
 dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
+
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.0")
         // Для воспроизведения аудио
     implementation("androidx.media:media:1.7.0")
@@ -66,6 +67,8 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.navigation.runtime.ktx)
+    implementation(libs.androidx.datastore.core)
+    implementation(libs.androidx.datastore.preferences.core.jvm)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

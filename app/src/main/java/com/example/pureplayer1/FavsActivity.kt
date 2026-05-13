@@ -15,7 +15,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FavoritesScreen(
@@ -26,29 +25,13 @@ fun FavoritesScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "Избранное",
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
+            Text(
+                text = "Избранное",
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(15.dp)
             )
         },
-        bottomBar = {
-            Column {
-//                MiniPlayer(
-//                    navController = navController,
-//                    currentRoute = currentRoute,
-//                    modifier = Modifier.padding(bottom = 4.dp)
-//                )
-//                bottomBarApp(navController, currentRoute)
-            }
-        }
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -84,16 +67,15 @@ fun FavoritesScreen(
                         )
                     }
                 }
-            } else {
-                // Список избранных треков
-                LazyColumn(
-                    contentPadding = PaddingValues(vertical = 8.dp)
-                ) {
+            }
+            else {
+                LazyColumn(contentPadding = PaddingValues(vertical = 8.dp)) {
                     items(favoriteTracks) { track ->
                         TrackItem(
                             track = track,
                             onTrackClick = {
-                                PlayerState.playTrack(track)
+                                // Воспроизводим трек с плейлистом избранного
+                                PlayerState.playTrack(track, favoriteTracks)
                                 navController.navigate(Routes.Player.route)
                             },
                             onLikeClick = {

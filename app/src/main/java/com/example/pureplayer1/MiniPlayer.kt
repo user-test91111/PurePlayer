@@ -7,10 +7,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -35,6 +33,11 @@ fun MiniPlayer(
 
     val currentTrack = PlayerState.currentTrack ?: return
     val isPlaying by PlayerState.audioPlayer.isPlaying.collectAsState()
+
+    // Состояние лайка для мини-плеера
+    var isLiked by remember(currentTrack) {
+        mutableStateOf(PlayerState.isTrackFavorite(currentTrack))
+    }
 
     Card(
         modifier = modifier
@@ -82,7 +85,10 @@ fun MiniPlayer(
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            Column(modifier = Modifier.weight(1f)) {
+            // Информация о треке
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
                 Text(
                     text = currentTrack.title ?: "Без названия",
                     style = MaterialTheme.typography.titleMedium,
@@ -98,6 +104,22 @@ fun MiniPlayer(
                 )
             }
 
+            // Кнопка лайка
+            IconButton(
+                onClick = {
+                    isLiked = PlayerState.toggleFavorite(currentTrack)
+                },
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                    contentDescription = if (isLiked) "Удалить из избранного" else "Добавить в избранное",
+                    tint = if (isLiked) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            // Кнопка Play/Pause
             IconButton(
                 onClick = { PlayerState.togglePlay() },
                 modifier = Modifier
@@ -115,6 +137,7 @@ fun MiniPlayer(
 
             Spacer(modifier = Modifier.width(4.dp))
 
+            // Кнопка закрытия
             IconButton(
                 onClick = { PlayerState.hide() },
                 modifier = Modifier.size(32.dp)
